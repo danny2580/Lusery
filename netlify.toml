@@ -1,5 +1,5 @@
 [build]
-  command = "rm -rf .cache node_modules/.vite dist 2>/dev/null; npm install && npm run build"
+  command = "rm -rf .cache node_modules/.vite attached_assets dist 2>/dev/null; npm install && npm run build"
   publish = "dist/public"
 
 [[redirects]]

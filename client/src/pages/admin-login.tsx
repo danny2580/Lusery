@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import logoUrl from "@assets/Diseño\ sin\ título_20251123_230018_0000_1763956927241.png";
 
 export default function AdminLogin() {
   const [, setLocation] = useLocation();
@@ -90,7 +89,7 @@ export default function AdminLogin() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center flex flex-col items-center">
           <div className="flex justify-center mb-3 w-full">
-            <img src={logoUrl} alt="LUSERY" className="h-28 w-auto" />
+            <img src="/lusery-logo.png" alt="LUSERY" className="h-48 w-auto" />
           </div>
           <CardTitle className="text-2xl" data-testid="text-login-title">
             Panel de Administración

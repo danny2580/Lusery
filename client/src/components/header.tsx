@@ -5,7 +5,6 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "./theme-provider";
 import { Link, useLocation } from "wouter";
-import luseryLogo from "@assets/Diseño\ sin\ título_20251123_230018_0000_1763956927241.png";
 
 interface HeaderProps {
   cartCount: number;
@@ -56,9 +55,7 @@ export function Header({ cartCount, favoritesCount, onCartClick, onSearch }: Hea
 
           {/* Logo */}
           <Link href="/">
-            <div className="flex items-center gap-2 cursor-pointer" data-testid="link-logo">
-              <img src={luseryLogo} alt="LUSERY" className="h-24 w-auto" />
-            </div>
+            <img src="/lusery-logo.png" alt="LUSERY Logo" className="h-20 w-auto cursor-pointer hover-elevate" data-testid="link-logo" />
           </Link>
 
           {/* Desktop Navigation */}
@@ -134,8 +131,9 @@ export function Header({ cartCount, favoritesCount, onCartClick, onSearch }: Hea
               className="relative h-11 w-11"
               onClick={onCartClick}
               data-testid="button-cart"
+              aria-label={`Carrito de compras${cartCount > 0 ? ` con ${cartCount} producto${cartCount !== 1 ? 's' : ''}` : ''}`}
             >
-              <ShoppingCart className="h-6 w-6 opacity-50" />
+              <ShoppingCart className="h-6 w-6" />
               {cartCount > 0 && (
                 <Badge
                   variant="destructive"
@@ -153,3 +151,4 @@ export function Header({ cartCount, favoritesCount, onCartClick, onSearch }: Hea
     </header>
   );
 }
+// Netlify build cache buster v2

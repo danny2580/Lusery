@@ -1,5 +1,18 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// Get API base URL from environment or default to current origin
+function getApiBaseUrl(): string {
+  const apiUrl = import.meta.env.VITE_API_URL;
+  if (apiUrl) {
+    return apiUrl;
+  }
+  // In development (Replit), use relative paths
+  // In production (Netlify), this will be overridden by VITE_API_URL
+  return "";
+}
+
+const API_BASE_URL = getApiBaseUrl();
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -25,7 +38,8 @@ export async function apiRequest(
     }
   }
 
-  const res = await fetch(url, {
+  const fullUrl = API_BASE_URL + url;
+  const res = await fetch(fullUrl, {
     method,
     headers,
     body,
@@ -42,7 +56,9 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const urlPath = queryKey.join("/") as string;
+    const fullUrl = API_BASE_URL + urlPath;
+    const res = await fetch(fullUrl, {
       credentials: "include",
     });
 

@@ -1,9 +1,10 @@
 [build]
   command = "npm install && npm run build"
   publish = "dist/public"
+  ignore = "attached_assets/**"
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
+  

@@ -10,9 +10,14 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Package, FolderTree, Image, LogOut, LayoutDashboard } from "lucide-react";
+import {
+  Package,
+  FolderTree,
+  Image,
+  LogOut,
+  LayoutDashboard,
+} from "lucide-react";
 import { Link, useLocation } from "wouter";
-import logoUrl from "@assets/file_00000000b16c71f5ab7a8039afa27aca_1763943356526.png";
 import { Button } from "./ui/button";
 
 const menuItems = [
@@ -54,7 +59,6 @@ export function AdminSidebar({ onLogout }: { onLogout: () => void }) {
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
-          <img src={logoUrl} alt="LUSERY" className="h-8 w-auto" />
           <div>
             <p className="text-sm font-semibold">LUSERY</p>
             <p className="text-xs text-muted-foreground">Admin Panel</p>
@@ -96,3 +100,4 @@ export function AdminSidebar({ onLogout }: { onLogout: () => void }) {
     </Sidebar>
   );
 }
+// Build cache buster

@@ -1,4 +1,5 @@
 import { type Server } from "node:http";
+import path from "path";
 
 import express, {
   type Express,
@@ -6,8 +7,12 @@ import express, {
   Response,
   NextFunction,
 } from "express";
+import cors from "cors";
 
 import { registerRoutes } from "./routes";
+
+// Serve static files from public folder
+const publicPath = path.resolve(import.meta.dirname, "..", "public");
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -17,6 +22,7 @@ export function log(message: string, source = "express") {
     hour12: true,
   });
 
+  // Logging utility for Lusery ecommerce platform
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
@@ -27,12 +33,28 @@ declare module 'http' {
     rawBody: unknown
   }
 }
+// CORS configuration - allow requests from Netlify and localhost
+app.use(cors({
+  origin: [
+    "https://lusery-backend.onrender.com",
+    "https://willowy-narwhal-12541d.netlify.app",
+    "http://localhost:3000",
+    "http://localhost:5000",
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
+
 app.use(express.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;
   }
 }));
 app.use(express.urlencoded({ extended: false }));
+
+// Serve static files first
+app.use(express.static(publicPath));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -94,3 +116,4 @@ export default async function runApp(
     log(`serving on port ${port}`);
   });
 }
+

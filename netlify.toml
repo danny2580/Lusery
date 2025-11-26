@@ -1,17 +1,9 @@
 [build]
-  command = "npm run build"
-  functions = "netlify/functions"
-  publish = "dist"
-
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/server:splat"
-  status = 200
+  command = "npm install && npm run build"
+  publish = "dist/public"
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-[context.production.environment]
-  NODE_ENV = "production"

@@ -1,4 +1,264 @@
-});
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Category, SubCategory } from "@shared/schema";
+import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { X, Save, Plus, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+
+const DEFAULT_SIZES = ["S", "M", "L", "XL"];
+
+export default function AdminProductForm() {
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const productId = new URLSearchParams(window.location.search).get("id");
+
+  // Form state
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [subCategoryId, setSubCategoryId] = useState("");
+  const [colors, setColors] = useState<string[]>([]);
+  const [newColor, setNewColor] = useState("");
+  const [customSizes, setCustomSizes] = useState<string[]>([]);
+  const [newCustomSize, setNewCustomSize] = useState("");
+
+  // Media state - simple structure
+  const [mediaItems, setMediaItems] = useState<Array<{
+    id: string;
+    color: string;
+    url: string;
+    size: string;
+    quantity: number;
+  }>>([]);
+
+  // Track size and quantity PER COLOR (not per photo)
+  const [colorSizeQuantity, setColorSizeQuantity] = useState<Record<string, { size: string; quantity: number }>>({});
+
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Queries
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
+  });
+
+  const { data: subCategories = [] } = useQuery<SubCategory[]>({
+    queryKey: ["/api/sub-categories"],
+  });
+
+  const { data: product } = useQuery({
+    queryKey: ["/api/products", productId],
+    enabled: !!productId,
+    queryFn: async () => {
+      if (!productId) return null;
+      const res = await fetch(`/api/products/${productId}`);
+      return res.json();
+    },
+  });
+
+  // Load product
+  useEffect(() => {
+    if (product && productId) {
+      setName(product.name);
+      setDescription(product.description || "");
+      setPrice(product.price);
+      setCategoryId(product.categoryId || "");
+      setSubCategoryId(product.subCategoryId || "");
+      
+      let parsedColors: string[] = [];
+      try {
+        if (!product.colors || product.colors === '' || product.colors === 'undefined') {
+          parsedColors = [];
+        } else if (typeof product.colors === 'string') {
+          parsedColors = JSON.parse(product.colors);
+          if (!Array.isArray(parsedColors)) parsedColors = [];
+        } else if (Array.isArray(product.colors)) {
+          parsedColors = product.colors;
+        }
+      } catch (e) {
+        console.error("Error parsing colors:", e, "value:", product.colors);
+        parsedColors = [];
+      }
+      setColors(parsedColors);
+
+      // Parse media
+      let media: any[] = [];
+      const colorSQ: Record<string, { size: string; quantity: number }> = {};
+      
+      if (product.mediaUrls) {
+        try {
+          const parsed = typeof product.mediaUrls === 'string' ? JSON.parse(product.mediaUrls) : product.mediaUrls;
+          if (Array.isArray(parsed)) {
+            parsed.forEach((colorGroup: any) => {
+              // Store the first photo's size and quantity as the color's size/quantity
+              if (colorGroup.photos && colorGroup.photos.length > 0) {
+                const firstPhoto = colorGroup.photos[0];
+                colorSQ[colorGroup.color] = {
+                  size: firstPhoto.size || "",
+                  quantity: firstPhoto.quantity || 0,
+                };
+              }
+              
+              if (colorGroup.photos) {
+                colorGroup.photos.forEach((photo: any, idx: number) => {
+                  media.push({
+                    id: `${colorGroup.color}-${idx}`,
+                    color: colorGroup.color,
+                    url: photo.url,
+                    size: photo.size || "",
+                    quantity: photo.quantity || 0,
+                  });
+                });
+              }
+            });
+          }
+        } catch (e) {
+          console.error("Error parsing mediaUrls:", e);
+        }
+      }
+      setMediaItems(media);
+      setColorSizeQuantity(colorSQ);
+
+      // Extract custom sizes
+      const existingSizes = new Set<string>();
+      media.forEach(m => {
+        if (m.size && !DEFAULT_SIZES.includes(m.size)) {
+          existingSizes.add(m.size);
+        }
+      });
+      setCustomSizes(Array.from(existingSizes));
+    }
+  }, [product, productId]);
+
+  // Calculate stock
+  const totalStock = mediaItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Mutations
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      // Group media by color - INCLUDE ALL PHOTOS (new and existing)
+      const mediaByColor: any[] = [];
+      colors.forEach(color => {
+        const colorPhotos = mediaItems.filter(m => m.color === color);
+        if (colorPhotos.length > 0) {
+          mediaByColor.push({
+            color,
+            photos: colorPhotos.map(p => ({
+              url: p.url,
+              size: p.size,
+              quantity: p.quantity,
+            })),
+          });
+        }
+      });
+
+      // Prepare FormData
+      const fd = new FormData();
+      fd.append("name", name);
+      fd.append("description", description);
+      fd.append("price", price);
+      fd.append("stock", String(totalStock));
+      fd.append("categoryId", categoryId || "");
+      fd.append("subCategoryId", subCategoryId || "");
+      fd.append("colors", JSON.stringify(colors));
+      fd.append("mediaUrls", JSON.stringify(mediaByColor));
+
+      if (!productId) {
+        fd.append("slug", name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""));
+      }
+
+      // Upload new media files
+      for (const item of mediaItems) {
+        if (item.url.startsWith('data:') || item.url.startsWith('blob:')) {
+          try {
+            const response = await fetch(item.url);
+            const blob = await response.blob();
+            fd.append("media", blob, `photo-${Date.now()}.${blob.type.split('/')[1]}`);
+          } catch (e) {
+            console.error("Error converting media:", e);
+          }
+        }
+      }
+
+      if (productId) {
+        return apiRequest("PUT", `/api/products/${productId}`, fd);
+      }
+      return apiRequest("POST", "/api/products", fd);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      toast({ title: productId ? "Producto actualizado" : "Producto creado" });
+      navigate("/admin/dashboard");
+    },
+    onError: (e: any) => {
+      console.error("Error:", e);
+      toast({ title: "Error al guardar", variant: "destructive" });
+    },
+  });
+
+  // Handlers
+  const handleAddColor = () => {
+    if (newColor.trim() && !colors.includes(newColor)) {
+      const updatedColors = [...colors, newColor];
+      setColors(updatedColors);
+      setColorSizeQuantity(prev => ({
+        ...prev,
+        [newColor]: { size: "", quantity: 0 }
+      }));
+      setNewColor("");
+      toast({ title: `Color "${newColor}" agregado` });
+    }
+  };
+
+  const handleRemoveColor = (color: string) => {
+    setColors(colors.filter(c => c !== color));
+    setMediaItems(mediaItems.filter(m => m.color !== color));
+    setColorSizeQuantity(prev => {
+      const newState = { ...prev };
+      delete newState[color];
+      return newState;
+    });
+    if (selectedColor === color) setSelectedColor(null);
+  };
+
+  const handleAddMedia = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!selectedColor) {
+      toast({ title: "Selecciona un color primero", variant: "destructive" });
+      return;
+    }
+
+    const files = Array.from(e.target.files || []);
+    let loadedCount = 0;
+    const colorData = colorSizeQuantity[selectedColor] || { size: "", quantity: 0 };
+
+    files.forEach((file, fileIdx) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const newItem = {
+          id: `${selectedColor}-${Date.now()}-${fileIdx}`,
+          color: selectedColor,
+          url: reader.result as string,
+          size: colorData.size,
+          quantity: colorData.quantity,
+        };
+        console.log("Adding photo:", newItem.id, "URL length:", (reader.result as string).length);
+        setMediaItems(prev => [...prev, newItem]);
+        loadedCount++;
+        if (loadedCount === files.length) {
+          toast({ title: `${files.length} foto(s) agregada(s)` });
+        }
+      };
+      reader.onerror = () => {
+        toast({ title: `Error al cargar ${file.name}`, variant: "destructive" });
       };
       reader.readAsDataURL(file);
     });
@@ -195,30 +455,28 @@
 
           {colorGroups.map((group) => (
             <div key={group.color} className="border rounded p-2 space-y-2">
-              <div className="flex items-center gap-2 justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-sm">{group.color}</h3>
-                  <Button 
-                    size="icon" 
-                    variant="outline"
-                    className="h-6 w-6"
-                    onClick={() => { setSelectedColor(group.color); fileInputRef.current?.click(); }}
-                    title="Agregar fotos para este color"
-                    data-testid="button-add-photos"
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-6 w-6 hover:text-destructive"
-                    onClick={() => handleRemoveColor(group.color)}
-                    title="Eliminar color"
-                    data-testid="button-delete-color"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-sm">{group.color}</h3>
+                <Button 
+                  size="icon" 
+                  variant="outline"
+                  className="h-6 w-6"
+                  onClick={() => { setSelectedColor(group.color); fileInputRef.current?.click(); }}
+                  title="Agregar fotos para este color"
+                  data-testid="button-add-photos"
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6 hover:text-destructive"
+                  onClick={() => handleRemoveColor(group.color)}
+                  title="Eliminar color"
+                  data-testid="button-delete-color"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
               </div>
 
               {group.photos.length > 0 && (
